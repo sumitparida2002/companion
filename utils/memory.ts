@@ -1,7 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
-import { Pinecone } from "@pinecone-database/pinecone";
-import { PineconeStore } from "@langchain/pinecone";
+import { PineconeClient } from "@pinecone-database/pinecone";
+import { PineconeStore } from "langchain/vectorstores/pinecone";
 
 export type CompanionKey = {
   companionName: string;
@@ -12,20 +12,21 @@ export type CompanionKey = {
 class MemoryManager {
   private static instance: MemoryManager;
   private history: Redis;
-  private vectorDBClient: Pinecone = new Pinecone();
+  private vectorDBClient!: PineconeClient;
 
   public constructor() {
     this.history = Redis.fromEnv();
     if (process.env.VECTOR_DB === "pinecone") {
-      this.vectorDBClient = new Pinecone();
+      this.vectorDBClient = new PineconeClient();
     }
   }
 
   public async init() {
-    if (this.vectorDBClient instanceof Pinecone) {
-      const pineconeIndex = this.vectorDBClient.Index(
-        process.env.PINECONE_INDEX!
-      );
+    if (this.vectorDBClient instanceof PineconeClient) {
+      await this.vectorDBClient.init({
+        apiKey: process.env.PINECONE_API_KEY!,
+        environment: process.env.PINECONE_ENVIRONMENT!,
+      });
     }
   }
 
@@ -35,7 +36,7 @@ class MemoryManager {
   ) {
     if (process.env.VECTOR_DB === "pinecone") {
       console.log("INFO: using Pinecone for vector search.");
-      const pineconeClient = <Pinecone>this.vectorDBClient;
+      const pineconeClient = <PineconeClient>this.vectorDBClient;
 
       const pineconeIndex = pineconeClient.Index(
         process.env.PINECONE_INDEX! || ""
